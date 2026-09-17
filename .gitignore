@@ -1,0 +1,51 @@
+# --- site config -------------------------------------------------------------
+# Holds host paths and the internal publish target. config.example.sh is the
+# committed template.
+config.sh
+
+# --- live account state ------------------------------------------------------
+# A simulated account, but still a record of someone's positions and capital.
+# Personal, not code -- keep it out of the repo regardless of repo visibility.
+paper_state*.json
+paper_orders.json
+paper_result*.json
+holdings.json
+sentinel_last.json
+.sentinel_hash
+*.log
+HANDOFF/state_snapshot_*/
+# Frozen snapshot of the real account (value, principal, holdings). Kept locally
+# for handoff; excluded from the repo because the repo is public.
+HANDOFF/02_LIVE_STATE.md
+
+# --- market data -------------------------------------------------------------
+# twstock.db is ~175 MB, above GitHub's 100 MB per-file limit, and is fully
+# regenerable:  python3 build_db.py raw twstock.db
+# raw/ is the real irreplaceable asset (TWSE throttles bulk backfill) but it is
+# ~78 MB of third-party data -- back it up somewhere that is meant for blobs.
+twstock.db
+twstock_new.db
+raw/
+*.zip
+news.json.gz
+
+# tdcc.db is APPEND-ONLY AND IRREPLACEABLE -- the TDCC feed serves only the
+# newest week with no history endpoint, so a lost snapshot is lost for good.
+# It is excluded here because git would store a new ~2 MB blob every week and
+# bloat the repo forever. BACK IT UP SEPARATELY. See HANDOFF/03_DECISION_LOG.md D7.
+tdcc.db
+
+# --- generated output --------------------------------------------------------
+# Dashboards embed live positions and this installation's publish URLs.
+*.html
+result*.json
+diagnostics.json
+optimized_params.json
+topn_sweep.json
+lookahead_demo.json
+
+# --- python ------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.bak
+manual_run.out

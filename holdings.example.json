@@ -1,0 +1,5 @@
+[
+  {"code": "2330", "shares": 100,  "cost": 1085.0, "note": "台積電"},
+  {"code": "2317", "shares": 1000, "cost": 214.5,  "note": "鴻海"},
+  {"code": "0056", "shares": 2000, "cost": 38.2,   "note": "高股息ETF"}
+]

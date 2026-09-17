@@ -1,0 +1,169 @@
+{
+  "snapshot_written": "2026-09-14",
+  "snapshot_of": "2026-09-11 05:01",
+  "project": "twstock — Taiwan paper-trading system (PERSONAL, not work-tracked)",
+  "root": "<project-root>",
+  "params": {
+    "top_n": 6,
+    "lookback_mom": 60,
+    "mom_skip": 5,
+    "ma_trend": 60,
+    "ma_slow": 200,
+    "chip_fgn_win": 20,
+    "chip_tru_win": 10,
+    "margin_win": 20,
+    "vol_win": 20,
+    "min_turnover": 50000000.0,
+    "min_price": 10.0,
+    "mom_cap": null,
+    "hold_buffer": 0,
+    "swap_wed_fri": false,
+    "mom_risk_adj": true,
+    "vol_ceiling": null,
+    "max_weight": null,
+    "rank_offset": 0,
+    "lot_size": 1,
+    "size_mode": "conviction",
+    "conv_tau": 0.6,
+    "conv_risk_parity": true,
+    "conv_max_weight": 0.25,
+    "conv_min_weight": 0.08,
+    "ladder_enable": true,
+    "ladder_max_tranches": 3,
+    "ladder_full_score": 1.5,
+    "ladder_exit": true,
+    "kline_win": 8,
+    "kline_tilt": 0.5,
+    "mkline_win": 6,
+    "mkline_tilt": 0.35,
+    "news_win": 5,
+    "news_decay": 0.7,
+    "news_scale": 3.0,
+    "stop_loss": -0.12,
+    "trail_stop": -0.15,
+    "stop_cooldown": 10,
+    "crash_day": -0.035,
+    "crash_dd": -0.12,
+    "emg_cooldown": 10,
+    "fee_rate": 0.001425,
+    "fee_discount": 1.0,
+    "tax_rate": 0.003,
+    "tax_rate_etf": 0.001,
+    "slippage": 0.001,
+    "min_fee": 20.0,
+    "capital": 1000000.0,
+    "market_proxy": "0050",
+    "large_cap": false,
+    "large_top_k": 50
+  },
+  "weights": {
+    "mom": 0.35,
+    "fgn": 0.3,
+    "tru": 0.25,
+    "margin": -0.1
+  },
+  "db": {
+    "price": {
+      "rows": 668357,
+      "first": "2024-08-01",
+      "last": "2026-09-11"
+    },
+    "chip": {
+      "rows": 648723,
+      "first": "2024-08-01",
+      "last": "2026-09-11"
+    },
+    "margin": {
+      "rows": 604587,
+      "first": "2024-08-01",
+      "last": "2026-08-18"
+    },
+    "exright": {
+      "rows": 3280,
+      "first": "2024-07-01",
+      "last": "2026-08-14"
+    }
+  },
+  "dashboards": {
+    "paper": "<paper-dashboard-url>",
+    "backtest": "<backtest-dashboard-url>",
+    "access": "PUBLIC - no access control"
+  },
+  "schedule": {
+    "cron": "0 5 * * 1-5 run_daily_paper.sh  (= 20:00 Taipei)",
+    "review_job": "twstock-review-2d, interval 172800s, in the agent runtime's job store"
+  },
+  "sentinel": {
+    "when": "2026-09-11 05:01",
+    "src": "74f79a156a7e1af9",
+    "why": "weekly regression",
+    "honest": {
+      "label": "x",
+      "start": "2025-08-14",
+      "end": "2026-08-14",
+      "days": 243,
+      "start_eq": 1000000,
+      "end_eq": 1685419,
+      "total_return": 0.685419,
+      "cagr": 0.7183216967328996,
+      "vol": 0.28562497217985644,
+      "sharpe": 2.462395676978909,
+      "sortino": 2.325474184116735,
+      "mdd": -0.1352070319299128,
+      "mdd_at": "2025-12-16",
+      "calmar": 5.312753977953275,
+      "best_day": 0.07065220530984351,
+      "worst_day": -0.050392961952221205,
+      "pos_days": 0.43388429752066116
+    },
+    "cheat": {
+      "label": "x",
+      "start": "2025-08-14",
+      "end": "2026-08-14",
+      "days": 243,
+      "start_eq": 1000000,
+      "end_eq": 2804517,
+      "total_return": 1.8045170000000001,
+      "cagr": 1.9137038852890287,
+      "vol": 0.18402027050830236,
+      "sharpe": 10.317906174381838,
+      "sortino": 12.258335731722672,
+      "mdd": -0.0550765367000281,
+      "mdd_at": "2025-11-21",
+      "calmar": 34.74626401641649,
+      "best_day": 0.03705833303790529,
+      "worst_day": -0.02933330618229213,
+      "pos_days": 0.5165289256198347
+    },
+    "ratio_ret": 0.3798351581060195,
+    "ratio_sharpe": 0.23865265252098833
+  },
+  "known_issues": [
+    "margin feed stalled since 2026-08-18 - fails silently, -0.10 margin signal going neutral",
+    "tdcc.db is append-only and irreplaceable (feed serves latest week only, no history endpoint) - carry it on any migration, never regenerate"
+  ],
+  "essential_to_migrate": [
+    "raw/",
+    "paper_state.json",
+    "paper_state_core.json",
+    "paper_orders.json",
+    "strategy.py",
+    "paper.py",
+    "core_sleeve.py",
+    "merge_report.py",
+    "report.py",
+    "make_dashboard.py",
+    "build_db.py",
+    "sentinel.py",
+    "kline_signal.py",
+    "news_signal.py",
+    "tdcc.py",
+    "tdcc.db",
+    "exp_factor.py",
+    "HANDOFF/"
+  ],
+  "rebuild_not_copy": [
+    "twstock.db (175MB, regenerate: python3 build_db.py raw twstock.db)"
+  ],
+  "account_snapshot": "omitted from the public repo (personal). Kept locally in HANDOFF/02_LIVE_STATE.md."
+}
