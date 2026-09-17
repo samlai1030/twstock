@@ -1,0 +1,103 @@
+name: weekly-dashboard
+
+# Cloud rebuild of the public backtest dashboard. Runs on GitHub's runners
+# (which have internet egress) so the PC bridge is no longer needed.
+#
+# Fail-closed, like the rest of this project: if the data fetch is broken
+# or coverage is too thin, the build job fails and the previously
+# published dashboard stays live untouched. Stale-but-correct beats
+# fresh-but-partial.
+#
+# Privacy: this bakes the STRATEGY BACKTEST ONLY. report.py is run without
+# --holdings, so no real positions ever enter result.json or the HTML.
+# The repo is public; keep it that way.
+
+on:
+  schedule:
+    # Monday 07:00 Asia/Taipei, after the full trading week is published.
+    - cron: "0 23 * * 0"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache raw TWSE dumps
+        uses: actions/cache@v4
+        with:
+          path: raw
+          # Weekly key: a warm cache means only the last ~7 days are fetched.
+          key: twse-raw-${{ github.run_id }}
+          restore-keys: |
+            twse-raw-
+
+      - name: Fetch market data (incremental)
+        run: |
+          mkdir -p raw
+          python3 fetch_ci.py
+          echo "raw files: $(ls raw | wc -l)"
+
+      - name: Build DB
+        run: python3 build_db.py raw twstock.db
+
+      - name: Fail-closed sanity gate
+        run: |
+          python3 - <<'EOF'
+          import sqlite3, datetime, sys
+          con = sqlite3.connect("twstock.db")
+          n  = con.execute("select count(*) from price").fetchone()[0]
+          nd = con.execute("select count(distinct date) from price").fetchone()[0]
+          mx = con.execute("select max(date) from price").fetchone()[0]
+          stale = (datetime.date.today() -
+                   datetime.date.fromisoformat(mx)).days
+          print(f"price rows={n} distinct_dates={nd} max_date={mx} "
+                f"stale_days={stale}")
+          ok = True
+          if n < 100000:
+              print(f"GATE FAIL: only {n} price rows"); ok = False
+          if nd < 200:
+              print(f"GATE FAIL: only {nd} distinct dates"); ok = False
+          if stale > 10:
+              print(f"GATE FAIL: data {stale}d stale"); ok = False
+          sys.exit(0 if ok else 1)
+          EOF
+
+      - name: Backtest + bake dashboard
+        run: |
+          END=$(python3 -c "import sqlite3;print(sqlite3.connect('twstock.db').execute('select max(date) from price').fetchone()[0])")
+          START=$(python3 -c "import datetime as d;print((d.date.fromisoformat('$END')-d.timedelta(days=365)).isoformat())")
+          echo "window $START -> $END"
+          # NOTE: no --holdings and no --news on purpose (public page).
+          python3 report.py --db twstock.db --start "$START" --end "$END" \
+              --json-out result.json
+          mkdir -p site
+          python3 make_dashboard.py --data result.json --out site/index.html
+          ls -la site/
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
