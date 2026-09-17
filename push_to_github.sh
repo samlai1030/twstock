@@ -15,11 +15,19 @@
 #
 # Usage:  ./push_to_github.sh ["commit message"]
 #         With no message, only already-committed work is pushed.
+#
+# THE REPO IS PUBLIC. Before adding a file, check it is not account state. The
+# .gitignore already excludes live state, the DBs, raw/, dashboards and config.sh,
+# and HANDOFF/02_LIVE_STATE.md (it holds real holdings) -- do not un-ignore any of
+# them. History was squashed to a single root commit on 2026-09-17 to purge an
+# earlier account snapshot; if personal data ever lands in a commit, force-pushing
+# is NOT enough, because unreachable commits stay fetchable by SHA on a public repo.
+# Recreate the repo instead.
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$HERE" || exit 1
 PC="${PC:-$HERE/../../.claude/skills/pc-operation/pc.py}"
-REPO="${GH_REPO:-samlai1030/twstock}"
+REPO="${GH_REPO:-samlai1030/twstock}"   # PUBLIC since 2026-09-17 -- see the privacy note below
 PC_DIR='C:\myclaw_tw'
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
