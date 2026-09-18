@@ -277,6 +277,48 @@ eye, not the score.
 
 ---
 
+
+**D8. 自營商 split: 自行買賣 vs 避險 as separate factors (`W["dlr_self"]`, `W["dlr_hedge"]`).**
+The open door from D5, tested 2026-09-18 via `exp_dealer_split.py` on the
+2025-09-15 -> 2026-09-14 window (FULL/H1/H2). Data: 100% of window chip rows
+carry the split (first date 2025-08-13), zero arithmetic violations
+(dealer_net == self + hedge everywhere). Construction: 10d turnover-normalised
+z-score, same as the D5 dealer test. Baseline `dlr_self=dlr_hedge=0`:
+**+74.3%, Sharpe 2.82, MDD -12.1%** (H1 +23.4%/2.50, H2 +41.2%/3.16).
+
+| weight | FULL ret | Sharpe | H1 ret | H1 Sh | H2 ret | H2 Sh |
+|---|---|---|---|---|---|---|
+| 0 (baseline) | +74.3% | 2.82 | +23.4% | 2.50 | +41.2% | 3.16 |
+| self +0.10 | +72.2% | 2.74 | +22.4% | 2.45 | +40.5% | 3.08 |
+| self +0.15 | +50.3% | 2.05 | +16.4% | 1.88 | +30.8% | 2.41 |
+| self +0.20 | +54.4% | 2.22 | +14.6% | 1.63 | +34.2% | 2.73 |
+| self +0.25 | +42.8% | 1.86 | +9.6% | 1.12 | +29.8% | 2.48 |
+| **self -0.10** | **+104.9%** | **4.16** | +28.2% | 2.90 | +58.7% | 5.36 |
+| self -0.15 | +84.1% | 3.32 | +21.4% | 2.07 | +49.6% | 4.42 |
+| hedge +0.15 (neg ctrl) | +64.4% | 2.66 | +15.0% | 1.52 | +44.5% | 3.97 |
+| hedge -0.15 (neg ctrl) | +90.1% | 3.07 | +26.2% | 2.52 | +49.8% | 3.55 |
+
+**Rejected -- do not adopt, despite the eye-catching -0.10 row.** Three reasons,
+in rule-A1 order:
+1. **No mechanism.** A negative weight means fading the proprietary desks' net
+   buying -- a backwards factor with no story behind it. D6 rejected exactly
+   this shape (persistent foreign *selling* is bullish) for the same reason.
+2. **The negative control fired too.** The 避險 leg is warrant hedging --
+   non-directional by construction, predicted pure noise -- yet -0.15 also beats
+   the baseline on all three windows. When the control "works", the experiment
+   is measuring noise, not a directional edge.
+3. **No dose response.** -0.10 is spectacular, -0.15 is mediocre in H1
+   (Sharpe 2.07 < baseline 2.50); +0.10 mildly bad, +0.15 much worse. Spiky,
+   asymmetric, no plateau -- the D2/D4 signature of fitting one year's luck.
+Unlike D6 there is no H1 collapse, which is why this needed all three reasons
+spelled out instead of one. **Both weights stay 0.0.** The aggregate-dealer
+verdict from D5 stands, now with the split tested: 自營商 flow, however sliced,
+does not earn a weight on this data.
+**Reusable insight: a negative control that also "works" is the experiment
+telling you the result is noise. Design the control before you run the sweep.**
+
+---
+
 ## E. The look-ahead defence, and what it taught
 
 Two layers, one cheap and one expensive.
