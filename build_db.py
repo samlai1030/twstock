@@ -57,7 +57,8 @@ def main():
                        low REAL, close REAL, volume REAL, turnover REAL, trades REAL,
                        PRIMARY KEY(date,code));
     CREATE TABLE chip(date TEXT, code TEXT, foreign_net REAL, trust_net REAL,
-                      dealer_net REAL, total_net REAL, PRIMARY KEY(date,code));
+                      dealer_net REAL, dealer_self REAL, dealer_hedge REAL,
+                      total_net REAL, PRIMARY KEY(date,code));
     CREATE TABLE margin(date TEXT, code TEXT, margin_bal REAL, short_bal REAL,
                         PRIMARY KEY(date,code));
     CREATE TABLE exright(date TEXT, code TEXT, prev_close REAL, ref_price REAL,
@@ -108,10 +109,17 @@ def main():
             if len(f) >= 19:
                 fgn = (num(r[4]) or 0) + (num(r[7]) or 0)
                 tru, dlr, tot = num(r[10]), num(r[11]), num(r[18])
-            else:                              # older 12-col layout
+                # 自營商 split (Sam 2026-09-18): 自行買賣 (proprietary, directional
+                # view) vs 避險 (warrant hedging, non-directional). Decision log D5
+                # left this door open -- the aggregate dealer_net tested as noise,
+                # plausibly because the hedge leg dilutes the directional signal.
+                dlr_self, dlr_hedge = num(r[14]), num(r[17])
+            else:                              # older 12-col layout: no split
                 fgn, tru, dlr, tot = num(r[2]), num(r[5]), num(r[8]), num(r[11])
-            rows.append((date, str(r[0]).strip(), fgn, tru, dlr, tot))
-        cur.executemany("INSERT OR REPLACE INTO chip VALUES(?,?,?,?,?,?)", rows)
+                dlr_self = dlr_hedge = None
+            rows.append((date, str(r[0]).strip(), fgn, tru, dlr,
+                         dlr_self, dlr_hedge, tot))
+        cur.executemany("INSERT OR REPLACE INTO chip VALUES(?,?,?,?,?,?,?,?)", rows)
         n += len(rows)
     print("chip rows:", n)
 

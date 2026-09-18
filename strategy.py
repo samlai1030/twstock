@@ -158,7 +158,13 @@ P = dict(
 # net-buy days, centred to [-1,1]. A distinct claim from W["fgn"], which is a
 # magnitude sum and can be carried by one block trade -- this asks whether the
 # buying was steady. Weight 0.0 until measured.
-W = dict(mom=0.35, fgn=0.30, tru=0.25, margin=-0.10, dlr=0.0, fgnp=0.0)
+# dlr_self / dlr_hedge = 自營商 split (Sam 2026-09-18): 自行買賣 (proprietary desks'
+# directional view) vs 避險 (hedging against warrants they issued -- non-directional
+# by construction). Decision log D5: the aggregate dealer_net tested as pure noise
+# in both directions, plausibly because the hedge leg dilutes any directional
+# signal. Both 0.0 until measured; the aggregate key stays for comparability.
+W = dict(mom=0.35, fgn=0.30, tru=0.25, margin=-0.10, dlr=0.0, fgnp=0.0,
+         dlr_self=0.0, dlr_hedge=0.0)
 
 
 def eff_max_w():
@@ -259,10 +265,14 @@ def load(db):
     for r in con.execute("SELECT * FROM price"):
         px[r["code"]][r["date"]] = dict(o=r["open"], h=r["high"], l=r["low"],
                                         c=r["close"], v=r["turnover"], name=r["name"])
+    cols = [r[1] for r in con.execute("PRAGMA table_info(chip)")]
+    has_split = "dealer_self" in cols      # False on a DB built before 2026-09-18
     for r in con.execute("SELECT * FROM chip"):
         chip[r["code"]][r["date"]] = dict(f=r["foreign_net"] or 0.0,
                                           t=r["trust_net"] or 0.0,
-                                          d=r["dealer_net"] or 0.0)
+                                          d=r["dealer_net"] or 0.0,
+                                          ds=(r["dealer_self"] if has_split else None),
+                                          dh=(r["dealer_hedge"] if has_split else None))
     for r in con.execute("SELECT * FROM margin"):
         mgn[r["code"]][r["date"]] = r["margin_bal"] or 0.0
     ex = defaultdict(dict)
@@ -394,6 +404,7 @@ def build_signals(P_, chip, mgn, dates, di, universe, news=None):
     d = dates[di]
     news = news or {}
     mom, fgn, tru, dlr, fgp, mar, vol = {}, {}, {}, {}, {}, {}, {}
+    dls, dlh = {}, {}
     for code in universe:
         s = P_.get(code, d)
         i0 = di - P["lookback_mom"]
@@ -413,6 +424,13 @@ def build_signals(P_, chip, mgn, dates, di, universe, news=None):
                 for j in range(max(0, di - P["chip_tru_win"] + 1), di + 1))
         dl = sum((chip.get(code, {}).get(dates[j], {}) or {}).get("d", 0.0)
                  for j in range(max(0, di - P["chip_dlr_win"] + 1), di + 1))
+        # 自營商 split legs: same 10d turnover-normalised construction as dlr.
+        # Missing (pre-split-era rows) contributes 0 -- coverage is reported by
+        # exp_dealer_split.py, not silently filled here.
+        dsl = sum(((chip.get(code, {}).get(dates[j], {}) or {}).get("ds") or 0.0)
+                  for j in range(max(0, di - P["chip_dlr_win"] + 1), di + 1))
+        dhl = sum(((chip.get(code, {}).get(dates[j], {}) or {}).get("dh") or 0.0)
+                  for j in range(max(0, di - P["chip_dlr_win"] + 1), di + 1))
         # persistence: how many of the window's sessions were net-buy days. Only
         # days the stock actually has a chip row count, so a thinly-reported name
         # is not scored as "never bought".
@@ -424,6 +442,8 @@ def build_signals(P_, chip, mgn, dates, di, universe, news=None):
         fgn[code] = f * s / turn
         tru[code] = t * s / turn
         dlr[code] = dl * s / turn
+        dls[code] = dsl * s / turn
+        dlh[code] = dhl * s / turn
 
         # retail leverage build-up = crowding = penalty
         m_now = mgn.get(code, {}).get(d)
@@ -469,13 +489,16 @@ def build_signals(P_, chip, mgn, dates, di, universe, news=None):
               if P.get("mom_risk_adj") else mom)
     zm, zf, zt, zg = zscore(mom_in), zscore(fgn), zscore(tru), zscore(mar)
     zd, zp = zscore(dlr), zscore(fgp)
+    zds, zdh = zscore(dls), zscore(dlh)
     # (b) volatility ceiling -- drop the wildest names from ranking entirely.
     vc = P.get("vol_ceiling") or 0.0
     score = {c: W["mom"] * zm[c] + W["fgn"] * zf[c] + W["tru"] * zt[c]
                 + W["margin"] * zg[c] + W.get("dlr", 0.0) * zd[c]
                 + W.get("fgnp", 0.0) * zp[c]
+                + W.get("dlr_self", 0.0) * zds[c] + W.get("dlr_hedge", 0.0) * zdh[c]
              for c in mom if not (vc and vol.get(c, 0.0) > vc)}
     return score, vol, dict(mom=mom, fgn=fgn, tru=tru, dlr=dlr, fgnp=fgp,
+                            dlr_self=dls, dlr_hedge=dlh,
                             mar=mar, news=nws, kline=kln, kline_m=klm)
 
 

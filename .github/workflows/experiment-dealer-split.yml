@@ -1,0 +1,74 @@
+name: experiment-dealer-split
+
+# One-shot experiment runner (Sam 2026-09-18): does the 自營商 自行買賣/避險
+# split earn a weight? Decision log D5 left this door open -- the aggregate
+# dealer_net tested as noise, plausibly because the hedge leg dilutes the
+# directional signal.
+#
+# Reuses the dashboard job's raw-data cache (restore-only; it does not write
+# back to the twse-raw- prefix) and builds its own throwaway DB. Nothing here
+# touches the live paper account or publishes anything: results are uploaded
+# as a run artifact for review.
+#
+# Trigger: Actions tab -> "experiment-dealer-split" -> Run workflow.
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  experiment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore raw TWSE dumps (from dashboard cache)
+        uses: actions/cache@v4
+        with:
+          path: raw
+          key: exp-raw-${{ github.run_id }}
+          restore-keys: |
+            twse-raw-
+
+      - name: Fetch market data (incremental)
+        run: |
+          mkdir -p raw
+          python3 fetch_ci.py
+          echo "raw files: $(ls raw | wc -l)"
+
+      - name: Build DB (with dealer split columns)
+        run: python3 build_db.py raw twstock.db
+
+      - name: Fail-closed sanity gate
+        run: |
+          python3 - <<'EOF'
+          import sqlite3, datetime, sys
+          con = sqlite3.connect("twstock.db")
+          n  = con.execute("select count(*) from price").fetchone()[0]
+          nd = con.execute("select count(distinct date) from price").fetchone()[0]
+          mx = con.execute("select max(date) from price").fetchone()[0]
+          stale = (datetime.date.today() -
+                   datetime.date.fromisoformat(mx)).days
+          print(f"price rows={n} distinct_dates={nd} max_date={mx} "
+                f"stale_days={stale}")
+          ok = True
+          if n < 100000:
+              print(f"GATE FAIL: only {n} price rows"); ok = False
+          if nd < 200:
+              print(f"GATE FAIL: only {nd} distinct dates"); ok = False
+          if stale > 10:
+              print(f"GATE FAIL: data {stale}d stale"); ok = False
+          sys.exit(0 if ok else 1)
+          EOF
+
+      - name: Run dealer-split experiment
+        run: python3 exp_dealer_split.py --out exp_dealer_split.json
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: exp-dealer-split-results
+          path: exp_dealer_split.json
